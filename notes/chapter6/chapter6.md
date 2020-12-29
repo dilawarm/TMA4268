@@ -1,4 +1,11 @@
 # Chapter 6 - Linear Model Selection and Regularization
 1. [Section 1 - Linear Model Selection and Best Subset Selection](section1.md)
 2. [Section 2 - Forward Stepwise Selection](section2.md)
-3. 
+3. [Section 3 - Backward Stepwise Selection](section3.md)
+4. [Section 4 - Estimating Test Error Using Mallow’s Cp, AIC, BIC, Adjusted R-squared](section4.md)
+5. [Section 5 - Estimating Test Error Using Cross-Validation](section5.md)
+6. [Section 6 - Shrinkage Methods and Ridge Regression](section6.md)
+7. [Section 7 - The Lasso](section7.md)
+8. [Section 8 - Tuning Parameter Selection for Ridge Regression and Lasso](section8.md)
+9. [Section 9 - Dimension Reduction](section9.md)
+10. [Section 10 - Principal Components Regression and Partial Least Squares](section10.md)
