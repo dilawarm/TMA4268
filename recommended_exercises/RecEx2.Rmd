@@ -3,7 +3,7 @@ title: 'Module 2: Recommended Exercises'
 author: "Dilawar Mahmood"
 date: "January 16, 2021"
 output:
-  html_document:
+  pdf_document:
     df_print: paged
     toc: no
     toc_depth: 2
