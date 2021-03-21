@@ -46,4 +46,6 @@ docs/
 # translation temp files
 po/*~
 
-*_files/
+*_files
+
+.html
