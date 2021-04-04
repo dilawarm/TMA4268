@@ -13,6 +13,8 @@ There are some missing values here, so before we proceed we will remove them:
 ```{r}
 Hitters=na.omit(Hitters)
 with(Hitters,sum(is.na(Salary)))
+head(Hitters)
+ncol(Hitters)
 ```
 
 

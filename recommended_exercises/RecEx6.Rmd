@@ -3,6 +3,10 @@ title: 'Module 6: Recommended Exercises'
 author: "Dilawar Mahmood"
 date: "Februar 28, 2021"
 output:
+  html_document:
+    toc: no
+    toc_depth: '2'
+    df_print: paged
   pdf_document:
     df_print: paged
     toc: no
@@ -64,6 +68,7 @@ ggpairs(data=pairwise_scatter_data)
 # Exclude 'ID' column
 credit_data <- subset(Credit, select=-c(ID))
 # Counting the dummy variables as well
+head(credit_data)
 credit_data_number_predictors <- 11
 # Take a look at the data
 head(credit_data)
