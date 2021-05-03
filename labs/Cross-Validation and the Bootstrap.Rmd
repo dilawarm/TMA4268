@@ -1,7 +1,7 @@
 ---
 title: 'Lab: Cross-Validation and the Bootstrap'
 author: "Dilawar Mahmood"
-date: "May 02k, 2021"
+date: "May 02, 2021"
 output:
   html_document:
     df_print: paged
