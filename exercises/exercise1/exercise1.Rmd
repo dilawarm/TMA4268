@@ -25,18 +25,6 @@ install.packages("pROC")
 install.packages("plotROC")
 ```
 
-
-
-
-For some problems you will need to include some LaTex code. Please install latex on your computer and then consult Compulsory1.Rmd for hints how to write formulas in LaTex. 
-
-An example:
-
-$$Y_i  = f(x_i) + \varepsilon_i \ ,$$
-
-Or the same formula $Y_i  = f(x_i) + \varepsilon_i$ in-line.
-
-
 # Problem 1
 
 ## a) See notes.

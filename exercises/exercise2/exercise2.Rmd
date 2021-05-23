@@ -1,0 +1,588 @@
+---
+subtitle: "TMA4268 Statistical Learning V2021"
+title: "Compulsory exercise 1"
+author: "Dilawar Mahmood"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document
+  # pdf_document
+---
+  
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE,tidy=TRUE,message=FALSE,warning=FALSE,strip.white=TRUE,prompt=FALSE,
+                      cache=TRUE, size="scriptsize",fig.width=4, fig.height=3,fig.align = "center")
+```
+
+# Problem 1
+
+## a)
+
+### i)
+
+TRUE.
+
+### ii)
+
+RSS will simply decrease the mode variables we include, so TRUE.
+
+### iii)
+
+This is a good idea, so TRUE.
+
+### iv)
+
+PCR reduces the dimensions by constructing linear combinations of the variables in a clever way. But it doesn't select variables. So FALSE.
+
+```{r}
+id <- "1iI6YaqgG0QJW5onZ_GTBsCvpKPExF30G"  # google file ID
+catdat <- read.csv(sprintf("https://docs.google.com/uc?id=%s&export=download", id), 
+    header = T)
+```
+
+```{r}
+set.seed(4268)
+train.ind = sample(1:nrow(catdat), 0.5 * nrow(catdat))
+catdat.train = catdat[train.ind, ]
+catdat.test = catdat[-train.ind, ]
+```
+
+## b)
+
+```{r}
+library(leaps)
+catdat.bestsub <- regsubsets(birds ~ ., data = catdat.train, nvmax = 16)
+(sum.bestsub <- summary(catdat.bestsub))
+```
+
+```{r}
+# Plot RSS, Adjusted R^2, C_p and BIC
+par(mfrow = c(2, 2))
+plot(sum.bestsub$rss, xlab = "Number of Variables", ylab = "RSS", type = "b")
+bsm_best_rss = which.min(sum.bestsub$rss)
+points(bsm_best_rss, sum.bestsub$rss[bsm_best_rss], col = "red", cex = 2, pch = 20)
+plot(sum.bestsub$adjr2, xlab = "Number of Variables", ylab = "Adjusted RSq", type = "b")
+bsm_best_adjr2 = which.max(sum.bestsub$adjr2)
+points(bsm_best_adjr2, sum.bestsub$adjr2[bsm_best_adjr2], col = "red", cex = 2, pch = 20)
+plot(sum.bestsub$cp, xlab = "Number of Variables", ylab = "Cp", type = "b")
+bsm_best_cp = which.min(sum.bestsub$cp)
+points(bsm_best_cp, sum.bestsub$cp[bsm_best_cp], col = "red", cex = 2, pch = 20)
+plot(sum.bestsub$bic, xlab = "Number of Variables", ylab = "BIC", type = "b")
+bsm_best_bic = which.min(sum.bestsub$bic)
+points(bsm_best_bic, sum.bestsub$bic[bsm_best_bic], col = "red", cex = 2, pch = 20)
+```
+
+Based on BIC, we could choose the model with 6 predictors, although we see that the other criterion choose models with more predictors. The predictors that minimize BIC are:
+
+```{r}
+coef(catdat.bestsub, bsm_best_bic)
+```
+
+```{r}
+predict.regsubsets = function(object, newdata, id, ...) {
+  form = as.formula(object$call[[2]])
+  mat = model.matrix(form, newdata)
+  coefi = coef(object, id = id)
+  xvars = names(coefi)
+  mat[, xvars] %*% coefi
+}
+```
+
+```{r}
+mse.bestsub <- mean((catdat.test$birds - predict.regsubsets(catdat.bestsub, catdat.test, id = bsm_best_bic))^2)
+mse.bestsub
+```
+
+## c)
+
+```{r}
+x.train <- model.matrix(birds ~ ., data = catdat.train)[, -1]
+y.train <- catdat.train$birds
+x.test = model.matrix(birds ~ ., data = catdat.test)[, -1]
+y.test = catdat.test$birds
+```
+
+```{r}
+library(glmnet)
+cv.lasso <- cv.glmnet(x.train, y.train, alpha = 1)
+plot(cv.lasso)
+```
+
+```{r}
+cv.lasso$lambda.min
+```
+
+```{r}
+catdat.lasso <- glmnet(x.train, y.train, alpha = 1, lambda = cv.lasso$lambda.min)
+
+coef(catdat.lasso)
+```
+
+```{r}
+mse.lasso = mean((y.test - predict(catdat.lasso, newx = x.test))^2)
+mse.lasso
+```
+
+## d)
+
+$\lambda\to\infty$: intercept only. $\lambda=0$: ordinary linear regression.
+
+## e)
+
+Intercept-only MSE can for example be found by
+
+```{r}
+mse.intercept <- mean((mean(y.train) - y.test)^2)
+mse.intercept
+```
+For the ordinary linear regression we could of course use `lm`.
+
+```{r}
+lm.pred <- predict(lm(birds ~ ., data = catdat.train), newdata = as.data.frame(x.test))
+(mse.lm <- mean((lm.pred - y.test)^2))
+```
+
+## f)
+
+```{r}
+mse.df <- data.frame(bestsubset = mse.bestsub, lasso = mse.lasso, intercept = mse.intercept, ols = mse.lm)
+mse.df
+```
+
+We see that lasso and best subset regression seem to be the best here. However, ordinary linear regression is not that much worse in this case. Not exactly sure why this is. There are many variables in the data set that don't really contribute that much to the response, but for some reason it doesn't overfit when they are included.
+
+# Problem 2
+
+## a)
+
+### i)
+
+TRUE, since the fit is linear beyond the boundary knots we free up some degrees of freedom.
+
+### ii)
+
+TRUE, a large penalty on the second-order derivative will lead to a linear fit.
+
+### iii)
+
+FALSE. The derivative at the knots is also continuous.
+
+### iv)
+
+FALSE. We need $7$ basis functions, but estimate $8$ parameters (including the intercept, which is not a basis function).
+
+## b)
+
+See notes.
+
+## c)
+
+```{r}
+mse_train = c()
+mse_test = c()
+plot(catdat.train$daily.outdoortime, catdat.train$birds, type = "p", col = "darkgrey")
+for (i in 1:10) {
+  poly.mod = lm(birds ~ poly(daily.outdoortime, degree= i), data = catdat.train)
+  lines(catdat.train$daily.outdoortime[order(catdat.train$daily.outdoortime)], poly.mod$fitted.values[order(catdat.train$daily.outdoortime)], col = i, lwd = 2)
+  mse_train[i] = mean(poly.mod$residuals^2)
+  mse_test[i] <- mean((predict(poly.mod, newdata = catdat.test) - catdat.test$birds)^2)
+}
+```
+
+```{r}
+mse_train
+```
+
+```{r}
+mse_test
+```
+
+The training error is becoming smaller for higher flexibility (i.e., polynomial degree). This is expected and is known as overfitting. On the other hand, the test error has a minimum for polynomial degree 2. Such a minimum is expected because of the bias-variance trade-off.
+
+# Problem 3
+
+## a)
+
+### i)
+
+TRUE.
+
+### ii)
+
+TRUE.
+
+### iii)
+
+FALSE. They used $k=5$ not $10$.
+
+### iv)
+
+FALSE. The tree with $6$ nodes is as good as the one with $3$ nodes, so we should use the simpler one.
+
+## b)
+
+The first cut at the root is `age < 81.5`, and that already leads to two nodes. Now the question is whether we will keep a second split on the left or the right branch. The split that is chosen is the one based on country, because this one leads to a much larger reduction in the deviance (visible from the branch lengths).
+
+## c)
+
+```{r}
+id <- "1Fv6xwKLSZHldRAC1MrcK2mzdOYnbgv0E"  # google file ID
+d.diabetes <- dget(sprintf("https://docs.google.com/uc?id=%s&export=download", id))
+d.train = d.diabetes$ctrain
+d.test = d.diabetes$ctest
+```
+
+### i)
+
+```{r}
+library(tree)
+t.diab = tree(diabetes ~ ., data=d.train)
+```
+
+```{r}
+set.seed(1)
+cv.diab = cv.tree(t.diab, K = 10)
+plot(cv.diab$size, cv.diab$dev, type = "b")
+```
+
+```{r}
+prune.diab = prune.tree(t.diab, best = 3)
+plot(prune.diab)
+text(prune.diab, pretty = 0)
+```
+
+```{r}
+library(caret)
+library(e1071)
+t.pred.prune <- predict(prune.diab, d.test, type = "class")
+(confMat <- confusionMatrix(t.pred.prune, d.test$diabetes)$table)
+```
+
+```{r}
+1 - (sum(diag(confMat))/sum(confMat[1:2, 1:2]))
+```
+
+### ii)
+
+We use the random forest approach.
+
+In a random forest, we have two parameters to decide: `mtry` and `ntree`.
+
+```{r}
+library(randomForest)
+set.seed(1)
+rf.diab = randomForest(diabetes ~ ., data = d.train, ntree = 1000, importance = TRUE)
+rf.diab
+```
+
+```{r}
+1 - (sum(diag(rf.diab$confusion))/sum(rf.diab$confusion[1:2, 1:2]))
+```
+
+$\sqrt{7}=2.65$, thus `mtry` should be $2$ (used by default) or 3. The number of trees is not a tuning parameter, so it should be chosen large enough.
+
+```{r}
+t.pred.rf <- predict(rf.diab, d.test, type = "class")
+(confMat <- confusionMatrix(t.pred.rf, d.test$diabetes)$table)
+```
+
+```{r}
+1 - (sum(diag(confMat))/sum(confMat[1:2, 1:2]))
+```
+
+The misclassification error is now slightly smaller than for the simple tree-based method, though the difference is not very impressive. To assess variable importance we can create a variable importance plot, or print the importance. According to those, plasma glucose concentration (glu) and BMI seem the most predictive variables.
+
+```{r}
+varImpPlot(rf.diab, pch = 20, main = "")
+```
+
+# Problem 4
+
+## a)
+
+### i)
+
+TRUE.
+
+### ii)
+
+TRUE.
+
+### iii)
+
+FALSE. Logistic regression is not possible, because $p>n$.
+
+### iv)
+
+TRUE. Bias-variance trade-off: $C$ large means we are allowing more violations of the boundaries, thus we increase the bias, reduce the variance and make the model more robust.
+
+## b)
+
+```{r}
+id <- "1x_E8xnmz9CMHh_tMwIsWP94czPa1Fpsj"  # google file ID
+d.leukemia <- read.csv(sprintf("https://docs.google.com/uc?id=%s&export=download", 
+    id), header = T)
+```
+
+```{r}
+set.seed(2399)
+t.samples <- sample(1:60, 15, replace = F)
+d.leukemia$Category <- as.factor(d.leukemia$Category)
+d.leukemia.test <- d.leukemia[t.samples, ]
+d.leukemia.train <- d.leukemia[-t.samples, ]
+```
+
+### i)
+
+Plain (i.e., unregularized) logistic regression is not able to handle the case $p>n$. Instead of an SVM we could also use a random forest or (better!) principal component regression. Can also a neural network.
+
+### ii)
+
+The paper suggests a way to do feature selection (i.e., finding the most predictive features, here: genes) in a SVM context. They do this by using an ensemble approach, namely bagging.
+
+### iii)
+
+Linear classifier using the `svm()` function:
+
+```{r}
+library(e1071)
+r.svm.linear <- svm(Category ~ ., data = d.leukemia.train, kernel = "linear", scale = TRUE, cost = 1)
+```
+
+Confusion tables using the prediction error:
+
+```{r}
+ypred_linear = predict(r.svm.linear, d.leukemia.train)
+(tt1 <- table(predict = ypred_linear, truth = d.leukemia.train[, "Category"]))
+```
+
+```{r}
+ypred_linear = predict(r.svm.linear, d.leukemia.test)
+(tt1 <- table(predict = ypred_linear, truth = d.leukemia.test[, "Category"]))
+```
+
+* It is not surprising to see zero training error: Due to $p>n$ the two groups are linearly separable (and we do not expect any ties in genome data).
+* The most common error are false negatives, that is, the prediction is "non-relapse" when the patient actually did relapse. This is not a very successful method, because we are missing the actual cases.
+
+### iv)
+
+$\gamma=0.01$:
+
+```{r}
+r.svm.radial2 <- svm(Category ~ ., data = d.leukemia.train, kernel = "radial", scale = TRUE, cost = 1, gamma = 0.01)
+
+ypred_radial2 = predict(r.svm.radial2, d.leukemia.train)
+(tt2 <- table(predict = ypred_radial2, truth = d.leukemia.train[, "Category"]))
+```
+
+```{r}
+ypred_radial2 = predict(r.svm.radial2, d.leukemia.test)
+(tt2 <- table(predict = ypred_radial2, truth = d.leukemia.test[, "Category"]))
+```
+
+$\gamma=10^{-5}$:
+
+```{r}
+r.svm.radial <- svm(Category ~ ., data = d.leukemia.train, kernel = "radial", scale = TRUE, cost = 1, gamma = 1e-05)
+
+ypred_radial = predict(r.svm.radial, d.leukemia.train)
+(tt2 <- table(predict = ypred_radial, truth = d.leukemia.train[, "Category"]))
+```
+
+```{r}
+ypred_radial = predict(r.svm.radial, d.leukemia.test)
+(tt2 <- table(predict = ypred_radial, truth = d.leukemia.test[, "Category"]))
+```
+
+When we see the results for $\gamma=0.01$, our reaction should be that we are overfitting: Zero training error, but the sensitivity of the method is zero on the test data.
+
+On the other hand, for $\gamma=10^{-5}$ things get even worse: We still have a sensitivity of zero for the test data, but now we in addition have sensitivity equals zero for the training data.
+
+## c)
+
+See notes.
+
+# Problem 5
+
+## a)
+
+### i)
+
+TRUE.
+
+### ii)
+
+FALSE, it does make a difference and they should be standardized.
+
+### iii)
+
+FALSE, the final clustering can vary dramatically based on the initialization - it finds a local optimum.
+
+### iv)
+
+FALSE, then we will just end up with as many principal components as we have variables.
+
+## b)
+
+```{r}
+x1 <- c(1, 2, 0, 4, 5, 6)
+x2 <- c(5, 4, 3, 1, 1, 2)
+```
+
+### i)
+
+```{r}
+library(ggplot2)
+set.seed(1)
+clusters <- sample(as.factor(c(0, 1)), replace = TRUE, size = length(x1))
+obs <- data.frame(x1 = x1, x2 = x2, clusters = clusters)
+ggplot(obs, aes(x = x1, y = x2, color = clusters)) + geom_point() + theme_bw()
+```
+
+```{r}
+library(dplyr)
+find_centroid <- function(obs) {
+  cluster1 <- obs %>% filter(clusters == 0)
+  cluster2 <- obs %>% filter(clusters == 1)
+  centroid1 <- c(mean(cluster1$x1), mean(cluster1$x2))
+  centroid2 <- c(mean(cluster2$x1), mean(cluster2$x2))
+  return(list(centroid1 = centroid1, centroid2 = centroid2))
+}
+
+centroids_it1 <- find_centroid(obs)
+
+ggplot(obs, aes(x = x1, y = x2, color = clusters)) + geom_point() + theme_bw() + geom_point(aes(centroids_it1$centroid1[1], centroids_it1$centroid1[2]), shape = 23, color = "red") + geom_point(aes(centroids_it1$centroid2[1], centroids_it1$centroid2[2]), shape = 23, color = "blue")
+```
+
+```{r}
+euc.dist <- function(x, centroid) sqrt(sum((x - centroid)^2))
+
+obs
+```
+
+```{r}
+for (i in 1:nrow(obs)) {
+  (dist_centroid1 <- euc.dist(obs[i, 1:2], centroids_it1$centroid1))
+  (dist_centroid2 <- euc.dist(obs[i, 1:2], centroids_it1$centroid2))
+  if (dist_centroid1 < dist_centroid2) {
+    obs[i, ]$clusters <- as.factor(0)
+  } else {
+    obs[i, ]$clusters <- as.factor(1)
+  }
+}
+obs
+```
+
+```{r}
+centroids_it2 <- find_centroid(obs)
+ggplot(obs, aes(x = x1, y = x2, color = clusters)) + geom_point() + theme_bw() + geom_point(aes(centroids_it2$centroid1[1], centroids_it2$centroid1[2]), shape = 23, color = "red") + geom_point(aes(centroids_it2$centroid2[1], centroids_it2u$centroid2[2]), shape = 23, color = "blue")
+```
+
+```{r}
+id <- "1VfVCQvWt121UN39NXZ4aR9Dmsbj-p9OU"  # google file ID
+GeneData <- read.csv(sprintf("https://docs.google.com/uc?id=%s&export=download", 
+    id), header = F)
+colnames(GeneData)[1:20] = paste(rep("H", 20), c(1:20), sep = "")
+colnames(GeneData)[21:40] = paste(rep("D", 20), c(1:20), sep = "")
+row.names(GeneData) = paste(rep("G", 1000), c(1:1000), sep = "")
+GeneData = t(GeneData)
+GeneData <- scale(GeneData)
+```
+
+## c)
+
+```{r}
+# dat = as.dist(t(d)) dat = as.dist(1-cor(d)) correlation based
+dat = as.dist(1 - cor(t(GeneData)))
+# eucledian distance
+dat2 = dist((GeneData), method = "euclidian")
+
+# hier.clust
+hc.complete = hclust(dat, method = "complete")
+hc.average = hclust(dat, method = "average")
+hc.single = hclust(dat, method = "single")
+
+hc.complete2 = hclust(dat2, method = "complete")
+hc.average2 = hclust(dat2, method = "average")
+hc.single2 = hclust(dat2, method = "single")
+```
+
+```{r}
+par(mfrow = c(2, 2))
+plot(hc.complete, main = "Complete, Cor")
+plot(hc.average, main = "Average, Cor")
+plot(hc.single, main = "Single, Cor")
+plot(hc.complete2, main = "Complete, Euc")
+plot(hc.average2, main = "Average, Euc")
+plot(hc.single2, main = "Single, Euc")
+```
+
+## d)
+
+```{r}
+# cut tree into two branches
+clustComp = cutree(hc.complete, k = 2)
+clustSing = cutree(hc.single, k = 2)
+clustAv = cutree(hc.average, k = 2)
+
+clustComp2 = cutree(hc.complete2, k = 2)
+clustSing2 = cutree(hc.single2, k = 2)
+clustAv2 = cutree(hc.average2, k = 2)
+
+# actual group:
+trueGroup = c(rep(1, 20), rep(2, 20))
+Comp = table(trueGroup, clustComp)
+Sing = table(trueGroup, clustSing)
+Av = table(trueGroup, clustAv)
+Comp2 = table(trueGroup, clustComp2)
+Sing2 = table(trueGroup, clustSing2)
+Av2 = table(trueGroup, clustAv2)
+
+errorRate = function(data) {
+  return((sum(data) - sum(diag(data)))/(sum(data)))
+}
+
+error = c(errorRate(Comp), errorRate(Sing), errorRate(Av), errorRate(Comp2), errorRate(Sing2), errorRate(Av2))
+error
+```
+
+All three linkages with Euclidean distance have zero errors - so it doesn't matter which one we choose next. (Not just all three with euclidean distance - the correlation based distance as well!)
+
+## e)
+
+```{r}
+# transform and add column for state (diseased/healthy)
+PCdata = as.data.frame((GeneData))
+
+PCdata$State = c(rep("Healthy", 20), rep("Sick", 20))
+
+library(ggfortify)
+pr.out = prcomp(PCdata[, 1:1000]) # , scale = T)
+autoplot(pr.out, data = PCdata, colour = "State")
+```
+
+```{r}
+# Proportion of variance explained
+pr.var = pr.out$sdev^2
+pve = pr.var/(sum(pr.var))
+plot(cumsum(pve), xlab = "Principal Component", y.lab = "Cum. prop of var. explained", ylim = c(0, 1), type = "b")
+abline(v = 5, col = "red")
+```
+
+```{r}
+cumsum(pve)[5]
+```
+
+The first five principal components explain $21.1\%$ of the variance in the data. However, we see from the plot that the first PC clearly separates the two groups.
+
+## f)
+
+Look at loadings/rotation vector of PCA and find which genes that contribute the most.
+
+```{r}
+# which genes contribute the most to PC1?
+ImpGenes = names(sort(abs(pr.out$rotation[, 1]), decreasing = T)[1:10])
+pr.out$rotation[match(ImpGenes, row.names(pr.out$rotation)), 1]
+```
+
+All these genes contribute with positive loadings for PCA, meaning that high values of these genes contribute to the disease group and low values point to the healthy point.
