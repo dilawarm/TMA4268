@@ -1,0 +1,411 @@
+---
+subtitle: "TMA4268 Statistical Learning V2021"
+title: "Compulsory exercise 1"
+author: "Dilawar Mahmood"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document
+  # pdf_document
+---
+  
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE,tidy=TRUE,message=FALSE,warning=FALSE,strip.white=TRUE,prompt=FALSE,
+                      cache=TRUE, size="scriptsize",fig.width=4, fig.height=3)
+```
+
+```{r rpackages,eval=FALSE,echo=FALSE}
+install.packages("knitr") #probably already installed
+install.packages("rmarkdown") #probably already installed
+install.packages("ggplot2") #plotting with ggplot
+install.packages("ggfortify")  
+install.packages("MASS")
+install.packages("class")
+install.packages("pROC")
+install.packages("plotROC")
+```
+
+
+
+
+For some problems you will need to include some LaTex code. Please install latex on your computer and then consult Compulsory1.Rmd for hints how to write formulas in LaTex. 
+
+An example:
+
+$$Y_i  = f(x_i) + \varepsilon_i \ ,$$
+
+Or the same formula $Y_i  = f(x_i) + \varepsilon_i$ in-line.
+
+
+# Problem 1
+
+## a) See notes.
+
+## b) See notes.
+
+## c) See notes.
+
+```{r, echo=TRUE, eval=TRUE}
+id <- "1X_8OKcoYbng1XvYFDirxjEWr7LtpNr1m" # google file ID
+values <- dget(sprintf("https://docs.google.com/uc?id=%s&export=download", id))
+X = values$X
+dim(X)
+x0 = values$x0
+dim(x0)
+beta=values$beta
+dim(beta)
+sigma=values$sigma
+sigma
+```
+
+ ## d)
+ 
+```{r, echo=TRUE, eval=TRUE}
+library(ggplot2)
+bias = function(lambda, X, x0, beta) {
+    p = ncol(X)
+    value = (t(x0) %*% solve(t(X) %*% X + lambda * diag(p)) %*% t(X) %*% X %*% beta - t(x0) %*% beta)^2
+    return(value)
+}
+lambdas = seq(0, 2, length.out = 500)
+BIAS = rep(NA, length(lambdas))
+for (i in 1:length(lambdas)) BIAS[i] = bias(lambdas[i], X, x0, beta)
+dfBias = data.frame(lambdas = lambdas, bias = BIAS)
+ggplot(dfBias, aes(x = lambdas, y = bias)) + geom_line(color = "red") + xlab(expression(lambda)) + 
+    ylab(expression(bias^2))
+```
+
+## e
+
+```{r}
+variance = function(lambda, X, x0, sigma) {
+  p = ncol(X)
+  inv = solve(t(X) %*% X + lambda * diag(p))
+  value = sigma^2 * t(x0) %*% inv %*% t(X) %*% X %*% inv %*% x0
+  return(value)
+}
+lambdas = seq(0, 2, length.out = 500)
+VAR = rep(NA, length(lambdas))
+for (i in 1:length(lambdas)) VAR[i] = variance(lambdas[i], X, x0, sigma)
+dfVar = data.frame(lambdas = lambdas, var = VAR)
+ggplot(dfVar, aes(x = lambdas, y = var)) + geom_line(color = "green4") + xlab(expression(lambda)) + ylab("variance")
+```
+
+## f)
+
+```{r}
+exp_mse = BIAS + VAR + sigma^2
+lambdas[which.min(exp_mse)]
+```
+
+```{r}
+dfAll = data.frame(lambda = lambdas, bias = BIAS, var = VAR, exp_mse = exp_mse)
+ggplot(dfAll) + geom_line(aes(x = lambda, y = exp_mse), color = "blue") + geom_line(aes(x = lambda, 
+    y = bias), color = "red") + geom_line(aes(x = lambda, y = var), color = "green4") + 
+    xlab(expression(lambda)) + ylab(expression(E(MSE)))
+```
+
+# Problem 2
+
+```{r}
+# read file
+id <- "1yYlEl5gYY3BEtJ4d7KWaFGIOEweJIn__"  # google file ID
+d.corona <- read.csv(sprintf("https://docs.google.com/uc?id=%s&export=download", 
+    id), header = T)
+```
+
+## a) 
+
+The number of deceased and non-deceased:
+```{r}
+table(d.corona$deceased)
+```
+
+For each country the number of males and females:
+```{r}
+table(d.corona$country, d.corona$sex)
+```
+
+The number of deceased and non-deceased for each sex:
+```{r}
+table(d.corona$deceased, d.corona$sex)
+```
+
+The number of deceased and non-deceased in France, separate for each sex:
+```{r}
+france = d.corona[which(d.corona$country == "France"), ]
+table(france$deceased, france$sex)
+```
+
+## b)
+
+```{r}
+r.glm <- glm(deceased ~ sex + age + country, d.corona, family = "binomial")
+summary(r.glm)
+anova(r.glm, test="Chisq")
+```
+
+### i)
+
+```{r}
+coefs <- summary(r.glm)$coef[, 1]
+eta <- coefs["(Intercept)"] + coefs["sexmale"] + 75 * coefs["age"] + coefs["countryKorea"]
+
+(prob <- exp(eta) / (1 + exp(eta)))
+```
+
+### ii)
+
+Yes, because estimate for `sexmale` is positive and $p=0.00275$.
+
+### iii)
+
+Yes, because $p=0.011390$.
+
+### iv)
+
+```{r}
+exp(coefs["age"] * 10)
+```
+
+## c)
+
+### i)
+
+```{r}
+mod2 = glm(deceased ~ sex * age + country, d.corona, family = "binomial")
+summary(mod2)
+```
+
+The slope for females is $\beta_2$ and the slope for males is $\beta_2+\beta_6$. Since $p=0.906350$ for `sexmale:age`, we have no evidence that $\beta_6\ne0.$ Therefore, age is not a greater risk factor for males than for females.
+
+### ii)
+
+```{r}
+mod3 = glm(deceased ~ sex + age * country, d.corona, family = "binomial")
+summary(mod3)
+```
+
+The slope for France is $\beta_2$ and the slope for Indonesia is $\beta_2+\beta_6.$ Since $p=0.02986$ for `age:countryindonesia`, there is evidence that $\beta_6<0.$ Therefore, age is a greater risk factor for the French population than for the Indonesian population.
+
+## d)
+
+### i)
+
+```{r}
+library(MASS)
+sum(d.corona$deceased)/nrow(d.corona)
+```
+
+TRUE.
+
+### ii)
+
+```{r}
+table(predict(lda(deceased ~ age + sex + country, data = d.corona))$class, true = d.corona$deceased)
+```
+
+TRUE.
+
+### iii)
+
+The false positive rate (specificity) for LDA is 1, so TRUE.
+
+### iv)
+
+```{r}
+table(predict(qda(deceased ~ age + sex + country, data = d.corona))$class, true = d.corona$deceased)
+```
+
+The sensitivity for LDA is $0$, and the sensitivity for $QDA$ is greater than $0$, so FALSE.
+
+# Problem 3
+
+```{r}
+# read file
+id <- "1i1cQPeoLLC_FyAH0nnqCnnrSBpn05_hO"  # google file ID
+diab <- dget(sprintf("https://docs.google.com/uc?id=%s&export=download", id))
+
+t = MASS::Pima.tr2
+train = diab$ctrain
+test = diab$ctest
+```
+
+## a)
+
+```{r}
+logReg = glm(diabetes ~ ., data = train, family = "binomial")
+summary(logReg)
+```
+
+### i)
+
+See notes.
+
+### ii)
+
+```{r}
+predLogistic = predict(logReg, newdata = test, type = "response")
+logClass = round(predLogistic)
+ta = table(test$diabetes, logClass)
+ta
+sensLog = ta[2, 2] / (sum(ta[2, ]))
+spesLog = ta[1, 1] / (sum(ta[1, ]))
+c(sensitivity = sensLog, specificity = spesLog)
+```
+
+## b)
+
+### i)
+
+See notes.
+
+### ii)
+
+__LDA__
+
+```{r}
+library(MASS)
+ldaMod = lda(diabetes ~ ., data = train)
+postLDA = predict(ldaMod, newdata = test)$posterior # posterior probabilities
+predLDA = predict(ldaMod, newdata = test)$class # predicted class | round(postLDA)
+tLDA = table(test$diabetes, predLDA)
+tLDA
+sensLDA = tLDA[2, 2] / (sum(tLDA[2, ]))
+spesLDA = tLDA[1, 1] / (sum(tLDA[1, ]))
+c(sensitivity = sensLDA, specificity = spesLDA)
+```
+
+__QDA__
+
+```{r}
+library(MASS)
+qdaMod = qda(diabetes ~ ., data = train)
+postQDA = predict(qdaMod, newdata = test)$posterior # posterior probabilities
+predQDA = predict(qdaMod, newdata = test)$class # predicted class | round(postQDA)
+tQDA = table(test$diabetes, predQDA)
+tQDA
+sensQDA = tQDA[2, 2] / (sum(tLDA[2, ]))
+spesQDA = tQDA[1, 1] / (sum(tLDA[1, ]))
+c(sensitivity = sensQDA, specificity = spesQDA)
+```
+
+## c)
+
+### i)
+
+See notes.
+
+### ii)
+
+See notes.
+
+### iii)
+
+```{r}
+library(class)
+trainKNN = subset(train, select = -diabetes)
+testKNN = subset(test, select = -diabetes)
+
+knnMod = knn(train = trainKNN, test = testKNN, cl = train$diabetes, k = 25, prob = T)
+
+(tKNN = table(true = test$diabetes, predicted = knnMod))
+
+sensKNN = tKNN[2, 2] / (sum(tKNN[2, ]))
+spesKNN = tKNN[1, 1] / (sum(tKNN[1, ]))
+c(sensitivity = sensKNN, specificity = spesKNN)
+```
+
+## d)
+
+```{r}
+library(pROC)
+library(plotROC)
+
+logReg.ROC = roc(response = test$diabetes, predictor = predLogistic)
+
+LDA.ROC = roc(response = test$diabetes, predictor = postLDA[, 2])
+QDA.ROC = roc(response = test$diabetes, predictor = postQDA[, 2])
+
+# The probabilities in the knnMod output are for the respective categorized
+# class, and not directly P(y=1), so we need to use 1-prob if the class was
+# categorized as 0. We generate the probKNN vector with the respective correct
+# information that we need for the ROC curve:
+probKNN = ifelse(knnMod == 0, 1 - attributes(knnMod)$prob, attributes(knnMod)$prob)
+KNN.ROC = roc(response = test$diabetes, predictor = probKNN)
+```
+
+```{r}
+probs = data.frame(diabetes = test$diabetes, logReg = predLogistic, LDA = postLDA[, 2], QDA = postQDA[, 2], KNN = probKNN)
+plProbs = melt_roc(probs, "diabetes", c("logReg", "LDA", "QDA", "KNN"))
+ggplot(plProbs, aes(d = D, m = M, color = name)) + geom_roc(n.cuts = F, size = 0.5) + xlab("1-Specificity") + ylab("Sensitivity")
+```
+
+```{r}
+aucAll = data.frame(auc = c(auc(logReg.ROC), auc(LDA.ROC), auc(QDA.ROC), auc(KNN.ROC)))
+rownames(aucAll) = c("logReg", "LDA", "QDA", "KNN")
+kableExtra::kable(aucAll)
+```
+
+# Problem 4
+
+## a)
+
+See notes.
+
+## b)
+
+### i)
+
+FALSE
+
+### ii)
+
+TRUE
+
+### iii)
+
+FALSE
+
+### iv)
+
+FALSE
+
+# Problem 5
+
+```{r}
+id <- "19auu8YlUJJJUsZY8JZfsCTWzDm6doE7C"  # google file ID
+d.bodyfat <- read.csv(sprintf("https://docs.google.com/uc?id=%s&export=download", 
+    id), header = T)
+```
+
+## a)
+
+```{r}
+r.lm <- lm(bodyfat ~ age + weight + bmi, data = d.bodyfat)
+summary(r.lm)$r.squared
+```
+
+## b)
+
+```{r}
+set.seed(4268)
+B <- 1000
+sample.R2 <- rep(NA, B)
+for (ii in 1:B) {
+  d.boot <- d.bodyfat[sample(1:nrow(d.bodyfat), size = nrow(d.bodyfat), replace = TRUE), ]
+  r.lm.boot <- lm(bodyfat ~ age + weight + bmi, data = d.boot)
+  sample.R2[ii] <- summary(r.lm.boot)$r.squared
+}
+hist(sample.R2)
+```
+
+```{r}
+sd(sample.R2)
+```
+
+```{r}
+quantile(sample.R2, c(0.025, 0.975))
+```
+
+There is uncertainty in $R^2$, although that is usually not visible/reported in the summary output.
