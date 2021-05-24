@@ -1,6 +1,6 @@
 ---
 subtitle: "TMA4268 Statistical Learning V2021"
-title: "Compulsory exercise 1"
+title: "Compulsory exercise 2"
 author: "Dilawar Mahmood"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 

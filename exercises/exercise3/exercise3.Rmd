@@ -1,0 +1,542 @@
+---
+subtitle: "TMA4268 Statistical Learning V2021"
+title: "Compulsory exercise 3"
+author: "Dilawar Mahmood"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document
+  # pdf_document
+---
+  
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE,tidy=TRUE,message=FALSE,warning=FALSE,strip.white=TRUE,prompt=FALSE,
+                      cache=TRUE, size="scriptsize",fig.width=4, fig.height=3,fig.align = "center")
+```
+
+# Problem 1
+
+```{r}
+library(ISLR)
+library(keras)
+set.seed(1)
+College$Private = as.numeric(College$Private)
+train.ind = sample(1:nrow(College), 0.5 * nrow(College))
+college.train = College[train.ind, ]
+college.test = College[-train.ind, ]
+str(College)
+```
+
+## a)
+
+```{r}
+train.data = subset(college.train, select = -c(Outstate))
+train.target = college.train$Outstate
+
+test.data = subset(college.test, select = -c(Outstate))
+test.target = college.test$Outstate
+
+mean = apply(train.data, 2, mean)
+std = apply(train.data, 2, sd)
+train.data = scale(train.data, center = mean, scale = std)
+test.data = scale(test.data, center = mean, scale = std)
+```
+
+## b)
+
+See notes.
+
+## c)
+
+__Build Model__
+
+```{r}
+build_model = function() {
+  model  = keras_model_sequential() %>% layer_dense(units = 64, activation = "relu", input_shape = ncol(train.data)) %>% layer_dense(units = 64, activation = "relu") %>% layer_dense(units = 1)
+  model %>% compile(optimizer = "rmsprop", loss = "mse", metrics = c("mae"))
+}
+```
+
+__Training the network__
+
+```{r}
+set.seed(123)
+
+model <- build_model()
+history = model %>% fit(train.data, train.target, epochs = 300, batch_size = 8, verbose = 0, validation_split = 0.2)
+
+plot(history)
+```
+
+```{r}
+result = model %>% evaluate(test.data, test.target)
+result
+```
+
+```{r}
+str(history)
+```
+
+## d)
+
+__Dropout__
+
+```{r}
+build_model = function() {
+  model  = keras_model_sequential() %>% layer_dense(units = 64, activation = "relu", input_shape = ncol(train.data)) %>% layer_dropout(rate = 0.4) %>% layer_dense(units = 64, activation = "relu") %>% layer_dropout(rate = 0.4) %>% layer_dense(units = 1)
+  model %>% compile(optimizer = "rmsprop", loss = "mse", metrics = c("mae"))
+}
+```
+
+```{r}
+# randomly allocate each sample to a particular fold
+set.seed(123)
+
+model_dropout = build_model()
+
+history = model_dropout %>% fit(train.data, train.target, epochs = 300, batch_size = 8, verbose = 0, validation_split = 0.2)
+
+plot(history)
+```
+
+```{r}
+result = model_dropout %>% evaluate(test.data, test.target)
+result
+```
+
+__L1 Regularization__
+
+```{r}
+build_model = function() {
+  model  = keras_model_sequential() %>% layer_dense(units = 64, activation = "relu", input_shape = ncol(train.data), kernel_regularizer = regularizer_l2(l = 0.001)) %>% layer_dense(units = 64, activation = "relu", kernel_regularizer = regularizer_l2(l = 0.001)) %>% layer_dense(units = 1)
+  model %>% compile(optimizer = "rmsprop", loss = "mse", metrics = c("mae"))
+}
+
+set.seed(123)
+
+model_l1 = build_model()
+
+history = model_l1 %>% fit(train.data, train.target, epochs = 300, batch_size = 8, verbose = 0, validation_split = 0.2)
+
+plot(history)
+```
+
+```{r}
+result = model_l1 %>% evaluate(test.data, test.target)
+result
+```
+
+* It seems that dropout improves the result from c, but keep in mind that there is some variability in the result. In any case, the test MSE does not get nearly as low as for the bagging, random forests and boosted regression trees.
+
+# Problem 2
+
+```{r}
+id <- "1CA1RPRYqU9oTIaHfSroitnWrI6WpUeBw" # google file ID
+d.corona <-read.csv(sprintf("https://docs.google.com/uc?id=%s&export=download",id), header = T)
+```
+
+## a)
+
+```{r}
+table(d.corona$deceased, d.corona$country)
+```
+
+```{r}
+table(d.corona$deceased, d.corona$sex)
+```
+
+```{r}
+France = d.corona[which(d.corona$country == "France"), ]
+Japan = d.corona[which(d.corona$country == "japan"), ]
+Indonesia = d.corona[which(d.corona$country == "indonesia"), ]
+Korea = d.corona[which(d.corona$country == "Korea"), ]
+
+table(France$deceased, France$sex)
+```
+
+```{r}
+table(Japan$deceased, Japan$sex)
+```
+
+```{r}
+table(Indonesia$deceased, Indonesia$sex)
+```
+
+```{r}
+table(Korea$deceased, Korea$sex)
+```
+
+## b)
+
+```{r}
+# Logistic regression
+r.glm <- glm(deceased ~ sex + age + country, d.corona, family = "binomial")
+summary(r.glm)
+```
+
+```{r}
+anova(r.glm, test = "Chisq")
+```
+
+### i)
+
+FALSE.
+
+### ii)
+
+FALSE.
+
+### iii)
+
+FALSE. The calculation is $e^{10\cdot\beta_\text{age}}=1.97$, but it's the odds that changes, not the odds ratio!
+
+### iv)
+
+FALSE, because $e^{\beta_{sex}}$ is the odds ratio, not the probability.
+
+## c)
+
+```{r}
+x.age <- seq(20, 100, 1)
+
+yMaleFrance = predict(r.glm, newdata = expand.grid(sex = "male", age = x.age, country = "France"), type = "response")
+yFemaleFrance = predict(r.glm, newdata = expand.grid(sex = "female", age = x.age, country = "France"), type = "response")
+yMaleJapan = predict(r.glm, newdata = expand.grid(sex = "male", age = x.age, country = "japan"), type = "response")
+yFemaleJapan = predict(r.glm, newdata = expand.grid(sex = "female", age = x.age, country = "japan"), type = "response")
+yMaleIndonesia = predict(r.glm, newdata = expand.grid(sex = "male", age = x.age, country = "indonesia"), type = "response")
+yFemaleIndonesia = predict(r.glm, newdata = expand.grid(sex = "female", age = x.age, country = "indonesia"), type = "response")
+yMaleKorea = predict(r.glm, newdata = expand.grid(sex = "male", age = x.age, country = "Korea"), type = "response")
+yFemaleKorea = predict(r.glm, newdata = expand.grid(sex = "female", age = x.age, country = "Korea"), type = "response")
+
+plot(x = x.age, y = yMaleFrance, type = "l", ylab = "P(death)", xlab = "Age")
+lines(x.age, yFemaleFrance, col = "black", lty = 2)
+lines(x.age, yMaleJapan, col = "blue")
+lines(x.age, yFemaleJapan, col = "blue", lty = 2)
+lines(x.age, yMaleIndonesia, col = "red")
+lines(x.age, yFemaleIndonesia, col = "red", lty = 2)
+lines(x.age, yMaleKorea, col = "green")
+lines(x.age, yFemaleKorea, col = "green", lty = 2)
+```
+
+## d)
+
+### i)
+
+__Yes__, this is clearly the case, as can be seen from the model fitted under b).
+
+### ii)
+
+```{r}
+mod2 = glm(deceased ~ sex + age + country + sex * age, d.corona, family = "binomial")
+summary(mod2)
+```
+
+__No__. The slope for women is $\beta_2$, while the slope for males is $\beta_2+\beta_6$. As we have no evidence that $\beta_6$ is different from zero ($p=0.89$), we have no evidence that age is a greater risk for males than for females.
+
+### iii)
+
+```{r}
+mod3 = glm(deceased ~ sex + age + country + age * country, d.corona, family = "binomial")
+summary(mod3)
+```
+
+__No__. The slope for age for the Korean population is $\beta_2+\beta_8$, while it is $\beta_2$ for French. Given that $p=0.35$ for $\beta_8$, so there is no evidence that age is an increased risk for French with respect to Korean.
+
+## e)
+
+It will probably have to do with how it was tested, that is, in France only severe cases were tested, whereas asian countries have tested much more.
+
+## f)
+
+### i)
+
+TRUE.
+
+### ii)
+
+TRUE.
+
+### iii)
+
+```{r}
+sum(d.corona$deceased)/nrow(d.corona)
+```
+
+TRUE.
+
+### iv)
+
+```{r}
+library(MASS)
+table(predict = predict(lda(deceased ~ age + sex + country, data = d.corona))$class, true = d.corona$deceased)
+```
+
+TRUE.
+
+# Problem 3
+
+```{r}
+id <- "1heRtzi8vBoBGMaM2-ivBQI5Ki3HgJTmO"# google file ID
+d.support <-read.csv(sprintf("https://docs.google.com/uc?id=%s&export=download",id), header = T)
+# We only look at complete cases
+d.support <- d.support[complete.cases(d.support), ]
+d.support <- d.support[d.support$totcst > 0, ]
+```
+
+## a)
+
+See notes.
+
+## b)
+
+```{r}
+r.lm <- lm(log(totcst) ~ age + temp + edu + resp + num.co + dzgroup, d.support)
+summary(r.lm)
+```
+
+```{r}
+anova(r.lm)
+```
+
+```{r}
+r.lm2 <- lm(log(totcst) ~ age + temp + edu + resp + num.co + dzgroup * age, d.support)
+summary(r.lm2)
+```
+
+```{r}
+anova(r.lm2)
+```
+
+### i)
+
+The expected costs should go down by a factor of $e^{10\cdot(-0.007)}=0.932$. Note that we need the exp-transformation to obtain the result on the scale of the costs (instead of log costs, which we used as the response).
+
+### ii)
+
+```{r}
+library(ggfortify)
+autoplot(r.lm, which = c(1, 2))
+```
+
+No violations visible.
+
+### iii)
+
+Yes, in the anova table we see that the $p$-value for the interaction between age and disease group is about $p=0.0002$, thus very small.
+
+## c)
+
+```{r}
+set.seed(12345)
+train.ind = sample(1:nrow(d.support), 0.8 * nrow(d.support))
+d.support.train = d.support[train.ind, ]
+d.support.test = d.support[-train.ind, ]
+```
+
+```{r}
+library(glmnet)
+x.train = model.matrix(log(totcst) ~ ., data = d.support.train)[, -1]
+y.train = log(d.support.train$totcst)
+set.seed(4268)
+cv.ridge = cv.glmnet(x.train, y.train, alpha = 0)
+plot(cv.ridge)
+```
+
+```{r}
+(lambda.ridge = cv.ridge$lambda.1se)
+```
+
+```{r}
+r.ridge = glmnet(x.train, y.train, alpha = 0, lambda = cv.ridge$lambda.1se)
+coef(r.ridge)
+```
+
+```{r}
+plot(glmnet(x.train, y.train, alpha = 0), "lambda")
+```
+
+```{r}
+x.test = model.matrix(log(totcst) ~ ., data = d.support.test)[, -1]
+y.test = d.support.test$totcst
+mse.ridge = mean((log(y.test) - predict(r.ridge, newx = x.test))^2)
+mse.ridge
+```
+
+## d)
+
+```{r}
+library(pls)
+set.seed(234)
+r.pls <- plsr(log(totcst) ~ ., data = d.support.train, scale = T, validation = "CV")
+summary(r.pls)
+```
+
+```{r}
+validationplot(r.pls)
+```
+
+```{r}
+# 6 or 7 components is the smallest number for several same CV errors
+mse.pls = mean((log(d.support.test$totcst) - predict(r.pls, x.test, ncomp = 6))^2)
+mse.pls
+```
+
+It looks like by using $6$ or $7$ PCs in PLS we can get a somewhat lower prediction error than for ridge regression. PLS is thus the preferred method, although the difference is small.
+
+## e)
+
+```{r}
+library(gam)
+gam.fit = gam(log(totcst) ~ poly(age, degree = 2) + dzgroup + num.co + s(edu, df = 3) + income + poly(scoma, degree = 2) + race + ns(meanbp, df = 4) + ns(hrt, df = 4) + ns(resp, df = 4) + ns(temp, df = 4), data = d.support.train)
+
+pred = predict(gam.fit, d.support.test)
+
+mse.gam = mean((pred - log(d.support.test$totcst))^2)
+mse.gam
+```
+
+```{r}
+d.support.train$dzgroup <- as.factor(d.support.train$dzgroup)
+d.support.train$income <- as.factor(d.support.train$income)
+d.support.train$race <- as.factor(d.support.train$race)
+
+d.support.test$dzgroup <- as.factor(d.support.test$dzgroup)
+d.support.test$income <- as.factor(d.support.test$income)
+d.support.test$race <- as.factor(d.support.test$race)
+```
+
+
+```{r}
+set.seed(4268)
+library(gbm)
+boost = gbm(log(totcst) ~ ., data = d.support.train, distribution = "gaussian", n.trees = 1000, interaction.depth = 4, shrinkage = 0.01)
+yhat.boost = predict(boost, newdata = d.support.test, n.trees = 1000)
+mse.boost = mean((log(d.support.test$totcst) - yhat.boost)^2)
+mse.boost
+```
+
+# Problem 4
+
+## a) 
+
+See notes.
+
+## b)
+
+### i)
+
+TRUE.
+
+### ii)
+
+TRUE.
+
+### iii)
+
+TRUE.
+
+### iv)
+
+FALSE.
+
+## c)
+
+### i)
+
+FALSE.
+
+### ii)
+
+TRUE.
+
+### iii)
+
+TRUE.
+
+### iv)
+
+FALSE. It would be with replacement.
+
+# Problem 5
+
+### i)
+
+TRUE.
+
+### ii)
+
+TRUE.
+
+### iii)
+
+FALSE.
+
+### iv)
+
+TRUE.
+
+## b)
+
+### i)
+
+FALSE.
+
+### ii)
+
+TRUE.
+
+### iii)
+
+FALSE.
+
+### iv)
+
+TRUE.
+
+## c)
+
+(iv) The bias will steadily increase.
+
+## d)
+
+(ii) It means that the performance of the $K$-nearest neighbor classifier gets worse when the number of predictor variables $p$ is large.
+
+## e)
+
+(i) $1.02\cdot10^{-7}$
+
+## f)
+
+### i)
+
+TRUE.
+
+### ii)
+
+TRUE.
+
+### iii)
+
+FALSE.
+
+### iv)
+
+TRUE.
+
+## g)
+
+### i)
+
+FALSEE The loading of PC2 is negative for 1500m, thus a negative value for this loading means that the athlete will run long times!
+
+### ii)
+
+TRUE. 100m and long jump lie on the same axis for PC1 and PC2 - just in opposite directions, because low times in 100m corresponds to high widths in long jump.
+
+### iii)
+
+TRUE, given that we look at the absolute values of the loadings.
+
+### iv)
+
+TRUE. 110m hurdle is almost parallel to PC1.
